@@ -1,0 +1,91 @@
+---
+title: "Prediction Assignment Writeup"
+author: "sarifah"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(randomForest)
+library(rpart)
+library(e1071)
+```
+
+## 1. Pendahuluan
+
+Tujuan dari proyek ini adalah membangun model machine learning untuk memprediksi bagaimana seseorang melakukan suatu latihan fisik berdasarkan data sensor. Variabel target adalah `classe`, yang mewakili kualitas gerakan.
+
+## 2. Pengumpulan dan Pra-pemrosesan Data
+
+```{r load-data}
+train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(url(train_url))
+testing <- read.csv(url(test_url))
+```
+
+### Membersihkan Data
+
+- Menghapus kolom kosong dan metadata (kolom 1–7)
+
+```{r clean-data}
+training <- training[, colSums(is.na(training)) == 0]
+training <- training[, -c(1:7)]
+testing <- testing[, colSums(is.na(testing)) == 0]
+testing <- testing[, -c(1:7)]
+```
+
+## 3. Pemisahan Data dan Validasi Silang
+
+```{r split-data}
+set.seed(12345)
+inTrain <- createDataPartition(training$classe, p = 0.7, list = FALSE)
+trainData <- training[inTrain, ]
+validData <- training[-inTrain, ]
+```
+
+## 4. Pembangunan Model
+
+Menggunakan Random Forest karena stabil, menangani fitur banyak, dan akurat untuk data sensor.
+
+```{r train-model}
+model_rf <- train(classe ~ ., data = trainData, method = "rf",
+                  trControl = trainControl(method = "cv", number = 5),
+                  importance = TRUE)
+```
+
+## 5. Evaluasi Model
+
+```{r evaluate-model}
+pred_valid <- predict(model_rf, newdata = validData)
+confusionMatrix(pred_valid, validData$classe)
+```
+
+## 6. Prediksi Kasus Uji
+
+```{r predict-test}
+pred_test <- predict(model_rf, newdata = testing)
+pred_test
+```
+
+### Simpan Prediksi ke File (untuk kuis)
+
+```{r save-predictions}
+pml_write_files <- function(x){
+  for(i in 1:length(x)){
+    filename <- paste0("problem_id_", i, ".txt")
+    write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  }
+}
+pml_write_files(pred_test)
+```
+
+## 7. Kesimpulan
+
+Model Random Forest menunjukkan kinerja akurat berdasarkan validasi silang dan evaluasi data validasi. Kami menggunakan metode ini karena kemampuannya menangani fitur multivariat dan data besar secara efisien.
+
+Validasi silang 5-fold mencegah overfitting dan memberikan estimasi akurasi di luar sampel yang dapat dipercaya.
+
+Model ini kemudian digunakan untuk memprediksi 20 data pengujian untuk dikirimkan ke kuis penilaian.
